@@ -6,6 +6,7 @@
 <title>Separador de Resoluciones</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -699,43 +700,112 @@ async function runAnalysis() {
   document.getElementById('startLabel').textContent = '▶ Re-analizar';
 }
 
-// ── Backend Local Python Detection ───────────────────────────────────────────
+// ── Analisis Interno del Navegador (Sin Servidor) ─────────────────────────
 async function detectStartPages(file) {
-  log(`Enviando documento a servidor local para análisis...`, 'info');
-  setP(40, `Analizando páginas con el motor Python...`);
-
-  const formData = new FormData();
-  formData.append('pdf', file);
-  formData.append('rangeStart', state.rangeStart || '');
-  formData.append('rangeEnd', state.rangeEnd || '');
-  formData.append('year', state.year || '');
-
-  try {
-    const analyzeUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000/api/analyze' : '/api/analyze';
-    const resp = await fetch(analyzeUrl, {
-      method: 'POST',
-      body: formData
-    });
-    
-    if (!resp.ok) {
-        const errObj = await resp.json();
-        log(`Error del servidor: ${errObj.error || resp.statusText}`, 'err');
-        return null;
-    }
-
-    const data = await resp.json();
-    let starts = data.starts || [];
-    state.blankPages = new Set(data.blanks || []);
-    
-    // Sort just in case
-    starts.sort((a,b) => a.page - b.page);
-    log(`  → ${starts.length} inicio(s) detectados por el servidor local`, starts.length>0?'ok':'');
-    return starts;
-    
-  } catch(e) {
-    log(`Error de conexión con servidor local (¿Está ejecutándose app.py?): ${e.message}`, 'err');
-    return null;
+  log(`Analizando PDF 100% en el navegador (Autónomo)...`, 'info');
+  setP(20, `Inicializando motor de análisis visual...`);
+  
+  const starts = [];
+  state.blankPages = new Set();
+  let worker = null;
+  
+  for(let i=1; i <= state.totalPages; i++) {
+     setP(20 + Math.round((i/state.totalPages)*40), `Analizando Pág ${i} de ${state.totalPages}...`);
+     const page = await state.pdfDoc.getPage(i);
+     const vp = page.getViewport({ scale: 1.0 });
+     
+     const textContent = await page.getTextContent();
+     let topText = "";
+     for(let item of textContent.items) {
+         if (item.transform[5] >= vp.height * 0.50) topText += item.str + " ";
+     }
+     
+     let text = topText.toUpperCase().trim();
+     let isBlank = false;
+     
+     if (text.length < 15) {
+         const scale = 0.5;
+         const vpSmall = page.getViewport({ scale });
+         const c = document.createElement('canvas');
+         c.width = vpSmall.width; c.height = vpSmall.height;
+         const ctx = c.getContext('2d', { willReadFrequently: true });
+         await page.render({ canvasContext: ctx, viewport: vpSmall }).promise;
+         
+         const dataUrl = c.toDataURL('image/jpeg', 0.5);
+         if (dataUrl.length < 6000) {  
+             isBlank = true;
+             state.blankPages.add(i);
+             log(`Página ${i} detectada como BLANCA por tamaño de píxeles.`, 'warn');
+         } else {
+             log(`Página ${i} escaneada. Leyendo letreo con IA Local...`, 'info');
+             if (!worker) {
+                 log(`Iniciando motor neuronal Tesseract.js (solo primera vez)...`, 'info');
+                 worker = await Tesseract.createWorker('spa+eng');
+                 await worker.setParameters({ tessedit_pageseg_mode: Tesseract.PSM.AUTO });
+             }
+             
+             const vpOcr = page.getViewport({scale: 2.0});
+             const cOcr = document.createElement('canvas');
+             cOcr.width = vpOcr.width; 
+             cOcr.height = vpOcr.height * 0.45;
+             const cFull = document.createElement('canvas');
+             cFull.width = vpOcr.width; cFull.height = vpOcr.height;
+             await page.render({ canvasContext: cFull.getContext('2d'), viewport: vpOcr }).promise;
+             
+             cOcr.getContext('2d').drawImage(cFull, 0, 0, cOcr.width, cOcr.height, 0, 0, cOcr.width, cOcr.height);
+             
+             try {
+                 const rec = await worker.recognize(cOcr);
+                 text = rec.data.text.toUpperCase();
+                 log(`  → IA extrajo: ${text.length} letras validas`, 'ok');
+             } catch(e) {
+                 log(`  → Error en OCR pág ${i}: ` + e.message, 'err');
+             }
+         }
+     }
+     
+     if (text.length > 0 && !isBlank) {
+         let isStart = false;
+         let number = null;
+         let year = state.year;
+         
+         let text_linear = text.replace(/\s+/g, ' ');
+         const cleanNum = (str) => str.replace(/[^\d]/g, '');
+         
+         let m1 = text_linear.match(/(?:RE[\w50]{3,10}CI[OÓ0]N(?:[\s_]+DIRECTORAL)?|R\.?[\s_]*D\.?)[\s_.,°º'"-]*(?:N[°ºro.\s_\-]+)?(\d[\d\s_-]{0,6}\d|\d{1,5})[\s_.-]*(\d{4})?/);
+         let m2 = text_linear.match(/DIRECTORAL[\s_.,°º'"-]*(?:N[°ºro.\s_\-]+)?(\d[\d\s_-]{0,6}\d|\d{1,5})[\s_.-]*(\d{4})?/);
+         let m3_re = /(?:RE[\w50]{3,10}CI[OÓ0]N)/.test(text_linear);
+         let m3_cond = text_linear.includes("VISTO") || text_linear.includes("CONSIDERANDO");
+         
+         if (m1) {
+             isStart = true;
+             number = cleanNum(m1[1]);
+             year = m1[2] || year;
+         } else if (m2) {
+             isStart = true;
+             number = cleanNum(m2[1]);
+             year = m2[2] || year;
+         } else if (m3_re && m3_cond) {
+             isStart = true;
+             let mNum = text_linear.match(/(?:N|NRO)[°º.\s_\-]+(\d[\d\s_-]{0,6}\d|\d{1,5})/);
+             if (mNum) {
+                 number = cleanNum(mNum[1]);
+             } else {
+                 let anyNum = text_linear.match(/\b([0-9]{3,5})\b/);
+                 if (anyNum) number = anyNum[1];
+             }
+         }
+         
+         if (isStart) {
+             starts.push({ page: i, isStart: true, number: number, year: year });
+         }
+     }
   }
+  
+  if (worker) await worker.terminate();
+  starts.sort((a,b) => a.page - b.page);
+  log(`  → ${starts.length} inicio(s) detectados localmente!`, starts.length>0?'ok':'warn');
+  return starts;
 }
 
 // ── Assign sequential numbers ──────────────────────────────────────────────
