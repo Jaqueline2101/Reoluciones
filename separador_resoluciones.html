@@ -711,7 +711,8 @@ async function detectStartPages(file) {
   formData.append('year', state.year || '');
 
   try {
-    const resp = await fetch('http://127.0.0.1:5000/api/analyze', {
+    const analyzeUrl = window.location.protocol === 'file:' ? 'http://127.0.0.1:5000/api/analyze' : '/api/analyze';
+    const resp = await fetch(analyzeUrl, {
       method: 'POST',
       body: formData
     });
