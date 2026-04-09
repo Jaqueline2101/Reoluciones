@@ -680,10 +680,10 @@ async function runAnalysis() {
     
     let isSpan = (actualStartPage !== effectiveEndPage);
     let pgStr = isSpan ? `pags ${actualStartPage}-${effectiveEndPage}` : `pag ${actualStartPage}`;
-    const filename = `RD ${numStr} ${year} - ${pgStr}.pdf`;
+    const filename = `RD ${numStr} ${year}.pdf`;
     
     state.resolutions.push({ filename, bytes, startPage: actualStartPage, endPage: effectiveEndPage, number, year, pageCount: idxs.length });
-    log(`✓ ${filename} — ${pgStr}`, 'ok');
+    log(`✓ Grabado ${filename} — (${pgStr})`, 'ok');
     setP(72 + Math.round(((i+1)/boundaries.length)*24), `Generando ${filename}...`);
   }
 
