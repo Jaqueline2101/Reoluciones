@@ -467,11 +467,11 @@ body {
     <div style="display:flex;gap:10px;">
       <div class="field" style="flex:1;">
         <label>N°</label>
-        <input type="text" id="mNum" placeholder="ej: 2201">
+        <input type="text" id="mNum" placeholder="ej: 2201" oninput="updateModalFilename()">
       </div>
       <div class="field" style="flex:1;">
         <label>Año</label>
-        <input type="text" id="mYear" placeholder="ej: 2007">
+        <input type="text" id="mYear" placeholder="ej: 2007" oninput="updateModalFilename()">
       </div>
     </div>
     <div class="field">
@@ -918,6 +918,7 @@ function renderResults() {
       <span class="pages-chip">${pages} ${pages===1?'hoja':'hojas'}</span>
       <span class="saved-chip" id="saved-${idx}">✓ guardado</span>
       <button class="btn btn-outline btn-sm" onclick="downloadOne(${idx})">⬇</button>
+      <button class="btn btn-outline btn-sm" style="color:var(--red);border-color:var(--red)" onclick="deleteRes(${idx})" title="Eliminar">🗑</button>
     `;
     grid.appendChild(card);
   });
@@ -1009,10 +1010,25 @@ function openModal(idx) {
   if (res.customPages) {
       document.getElementById('mPagesList').value = res.customPages;
   } else {
-      document.getElementById('mPagesList').value = res.startPage === res.endPage ? `${res.startPage}` : `${res.startPage}-${res.endPage}`;
+  document.getElementById('mPagesList').value = res.startPage === res.endPage ? `${res.startPage}` : `${res.startPage}-${res.endPage}`;
   }
   document.getElementById('overlay').classList.add('open');
 }
+
+function updateModalFilename() {
+  const num = document.getElementById('mNum').value.trim();
+  const yearStr = document.getElementById('mYear').value.trim() || 'XXXX';
+  const numStr = num ? String(num).padStart(4, '0') : 'XXXX';
+  document.getElementById('mFilename').value = `RD ${numStr} ${yearStr}.pdf`;
+}
+
+function deleteRes(idx) {
+  if (confirm('¿Estás seguro de eliminar esta resolución de la lista?')) {
+    state.resolutions.splice(idx, 1);
+    renderResults();
+  }
+}
+
 function closeModal() { document.getElementById('overlay').classList.remove('open'); }
 async function saveModal() {
   const filename = document.getElementById('mFilename').value.trim();
