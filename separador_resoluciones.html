@@ -295,13 +295,20 @@ body {
 @keyframes up { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:none} }
 .res-card:hover { border-color: var(--accent); }
 .res-badge {
-  width: 44px; height: 36px;
+  width: 50px; height: 46px;
   background: rgba(79,142,247,0.12);
   border-radius: 6px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700; color: var(--accent);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
   flex-shrink: 0; text-align: center; line-height: 1.2;
 }
+.res-badge-input {
+  background: transparent; border: none; outline: none;
+  width: 85%; text-align: center;
+  font-size: 12px; font-weight: 800; color: var(--accent);
+  font-family: 'Inter', sans-serif;
+  margin-bottom: 2px; cursor: text;
+}
+.res-badge-input:focus { background: #fff; box-shadow: 0 0 0 1px var(--accent); border-radius: 3px; }
 .res-info { flex: 1; min-width: 0; }
 .res-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .res-sub { font-size: 10px; color: var(--muted); margin-top: 3px; }
@@ -907,7 +914,10 @@ function renderResults() {
     card.style.animationDelay = (idx * 0.03) + 's';
     card.id = `card-${idx}`;
     card.innerHTML = `
-      <div class="res-badge">${String(res.number).padStart(4,'0')}<br><span style="font-size:8px;opacity:.6">${res.year}</span></div>
+      <div class="res-badge">
+        <input type="text" class="res-badge-input" value="${String(res.number).padStart(4,'0')}" onchange="updateResNumberInline(${idx}, this.value)" title="Hacer clic para editar número directo">
+        <span style="font-size:9px;opacity:.6">${res.year}</span>
+      </div>
       <div class="res-info">
         <div class="res-name">${res.filename}</div>
         <div class="res-sub">
@@ -1027,6 +1037,17 @@ function deleteRes(idx) {
     state.resolutions.splice(idx, 1);
     renderResults();
   }
+}
+
+function updateResNumberInline(idx, val) {
+   const res = state.resolutions[idx];
+   const clean = val.replace(/[^\d]/g, '');
+   if (clean) {
+       res.number = clean;
+       const numStr = String(clean).padStart(4, '0');
+       res.filename = `RD ${numStr} ${res.year}.pdf`;
+   }
+   renderResults();
 }
 
 function closeModal() { document.getElementById('overlay').classList.remove('open'); }
