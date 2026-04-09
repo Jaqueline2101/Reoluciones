@@ -1,0 +1,6 @@
+.env
+.git/
+__pycache__/
+temp_uploaded.pdf
+*.bat
+*.vbs

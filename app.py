@@ -6,11 +6,12 @@ import fitz  # PyMuPDF
 import pytesseract
 from PIL import Image
 import io
-
+import platform
 app = Flask(__name__)
 
 # Configurar ruta de Tesseract en Windows
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+if platform.system() == 'Windows':
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 # Permitir peticiones desde HTML local
 CORS(app)
 
