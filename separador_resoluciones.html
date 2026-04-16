@@ -111,7 +111,7 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
 }
 .res-actions button:hover { background: #f3f4f6; color: var(--text); }
 .btn-download-all {
-  margin: 24px; width: calc(100% - 48px); background: white; color: var(--text); border: 2px solid var(--border); padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s;
+  background: white; color: var(--text); border: 2px solid var(--border); padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; flex: 1; text-align: center;
 }
 .btn-download-all:hover { border-color: var(--accent); color: var(--accent); }
 
@@ -169,7 +169,11 @@ body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--tex
         Aún no has agrupado ninguna resolución.
       </div>
     </div>
-    <button class="btn-download-all" id="btnDlAll" style="display:none;" onclick="downloadAllZip()">📦 Descargar todo en ZIP</button>
+    
+    <div style="display:flex; gap:10px; margin: 24px; display:none;" id="actionButtons">
+      <button class="btn-download-all" onclick="downloadToFolder()">📂 Guardar a Carpeta</button>
+      <button class="btn-download-all" onclick="downloadAllZip()">📦 Bajarlas en ZIP</button>
+    </div>
   </div>
 </div>
 
@@ -224,7 +228,7 @@ fileIn.addEventListener('change', async (e) => {
   // reset state
   grid.innerHTML = '';
   document.getElementById('finalizedList').innerHTML = '<div style="text-align:center; padding: 40px 20px; color: var(--muted); font-size: 13px;" id="emptyState">Aún no has agrupado ninguna resolución.</div>';
-  document.getElementById('btnDlAll').style.display = 'none';
+  document.getElementById('actionButtons').style.display = 'none';
   state.selectedPages = [];
   state.completedResolutions = [];
   state.pageCanvases = [];
@@ -470,12 +474,12 @@ function renderCompletedList() {
   
   if (state.completedResolutions.length === 0) {
     if(empty) empty.style.display = 'block';
-    document.getElementById('btnDlAll').style.display = 'none';
+    document.getElementById('actionButtons').style.display = 'none';
     return;
   }
   
   if(empty) empty.style.display = 'none';
-  document.getElementById('btnDlAll').style.display = 'block';
+  document.getElementById('actionButtons').style.display = 'flex';
   list.innerHTML = '';
   
   state.completedResolutions.forEach((res, i) => {
@@ -575,6 +579,40 @@ async function downloadAllZip() {
     Swal.close();
   } catch(e) {
     Swal.fire('Error', 'Fallo al empaquetar el ZIP', 'error');
+  }
+}
+
+async function downloadToFolder() {
+  if (state.completedResolutions.length === 0) return;
+  
+  if (!window.showDirectoryPicker) {
+      Swal.fire('Función inactiva', 'Para usar esta función directa, debes abrir esta herramienta mediante su dirección web local o usar Chrome. Usa el botón ZIP en su defecto.', 'warning');
+      return;
+  }
+  
+  try {
+      const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite', id: 'pdf_separator', startIn: 'documents' });
+      
+      Swal.fire({ title: 'Guardando Archivos...', html: '<b>Guardando directamente en tu carpeta...</b>', allowOutsideClick: false });
+      Swal.showLoading();
+      
+      let savedCount = 0;
+      for (let i = 0; i < state.completedResolutions.length; i++) {
+         const res = state.completedResolutions[i];
+         let finalFilename = res.name;
+         
+         const fileHandle = await dirHandle.getFileHandle(finalFilename, { create: true });
+         const writable = await fileHandle.createWritable();
+         await writable.write(res.bytes);
+         await writable.close();
+         savedCount++;
+      }
+      
+      Swal.fire('¡Éxito corporativo!', `Se inyectaron ${savedCount} PDFs directamente a la carpeta que elegiste de tu computadora.`, 'success');
+  } catch(e) {
+      if (e.name !== 'AbortError') {
+          Swal.fire('Permiso Denegado', 'El navegador impidió escribir en esa carpeta. Intenta con otra o usa la función ZIP.', 'error');
+      }
   }
 }
 </script>
