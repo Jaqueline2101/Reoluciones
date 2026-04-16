@@ -420,8 +420,9 @@ async function extractNameFromPage(pageNum) {
 }
 
 // Join Rango
-btnJoin.addEventListener('click', async () => {
-  if (state.selectedPages.length === 0) return;
+btnJoin.addEventListener('click', async (e) => {
+  if (btnJoin.disabled || state.selectedPages.length === 0) return;
+  btnJoin.disabled = true; // Prevenir múltiples uniones si se presiona Enter repetidas veces
   const name = nameInput.value.trim() || `Resolucion_SinNombre_${Date.now()}.pdf`;
   const finalName = name.toLowerCase().endsWith('.pdf') ? name : name + '.pdf';
   
